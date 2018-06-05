@@ -26,6 +26,51 @@ The steps for this method is:
 
 ### Feature Detection:
 
+In computer vision, the conecpt of feature detection referes to methods that aim to compute abstractions of image information which are given by points or groups of points in images. 
+Feature detection in general means finding interesting points (features) in the image such as corners, templates, edges, and so on.
+So by looking in both the reference and target images for features that are similar and stands out, we can later match those features to find the reference image inside of the target image (i.e., card, AR marker).
+For this project, it is assumed that the same object is found when there are enough features that are matched.
+
+Conditions:
+
+- Reference image should show only the object that you want to track
+- Dimensions of the reference image should be given
+- Feature in the images should be unique (such as corners or edges), and the object in the reference should be invariant
+
+### Feature Description:
+
+In pattern recognition, feature extraction is a special form of dimensionality reduction. 
+When the input image to an algorithm is too large to be processed and it is suspected to be notoriously redundant, then the input image will be transformed into a reduced representation set of features (feature vector).
+This process of turning the input image into a set of features is called feature extraction.
+In short, feature extraction represets the interesting points found by feature detector and compare them with other feature points in the image to reduce the representation.
+
+There are many algorithms that extract image features and compute its descriptors such as SIFT, SURF, or Harris.
+The one that we will use in this project is OpenCV's native algorithm, the ORB (Oriented FAST and Rotated BRIEF).
+This will produce binary strings as its descriptor.
+
+```python
+
+img = cv2.imread('some_image.png', 0)
+
+orb = cv2.ORB_create()  # initialize detector
+kp = orb.detect(img, None)  # find keypoints
+kp, des = orb.compute(img, kp)  # compute descriptors
+
+img2 = cv2.drawKeypoints(img, kp, img, color=(0, 255, 0), flags=0)
+cv2.imshow('keypoints', img2)
+cv2.waitKey(0)
+```
+
+### Feature Matching:
+
+
+
+
+
+
+
+
+
 
 
 
