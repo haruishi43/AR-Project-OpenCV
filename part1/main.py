@@ -3,12 +3,10 @@ import cv2
 
 MIN_MATCHES = 20
 
-
-
 def main():
     
     # Compute model first
-    model = cv2.imread('data/model.jpg', 0)
+    model = cv2.imread('../data/model.jpg', 0)
 
     # ORB keypoint detector
     orb = cv2.ORB_create()              
@@ -48,29 +46,14 @@ def main():
             if len(matches) > MIN_MATCHES:
                 gray_frame = cv2.drawMatches(model, kp_model, gray_frame, kp_frame, matches[:MIN_MATCHES], 0, flags=2)
                 
-                # assuming matches stores the matches found and 
-                # returned by bf.match(des_model, des_frame)
-                # differenciate between source points and destination points
-                src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                # compute Homography
-                M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-
-                # Draw a rectangle that marks the found model in the frame
-                h, w = model.shape
-                pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
-                # project corners into frame
-                dst = cv2.perspectiveTransform(pts, M)  
-                # connect them with lines
-                img2 = cv2.polylines(frame, [np.int32(dst)], True, 255, 3, cv2.LINE_AA) 
-                cv2.imshow('frame', img2)
+                cv2.imshow('frame', gray_frame)
             else:
                 print("Not enough matches have been found - {} / {}".format( len(matches), MIN_MATCHES))
                 # show result
-                cv2.imshow('frame', frame)
+                cv2.imshow('frame', gray_frame)
         else:
             print("taget has no features!")
-            cv2.imshow('frame', frame)
+            cv2.imshow('frame', gray_frame)
         
         if cv2.waitKey(150) == ord('q'): # exit on `q`
             break
