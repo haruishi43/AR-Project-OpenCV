@@ -1,15 +1,12 @@
 import numpy as np
 import cv2
 
-MIN_MATCHES = 15
+MIN_MATCHES = 20
 
 def main():
     
     # Compute model first
     model = cv2.imread('../data/model.jpg', 0)
-    # Draw a rectangle that marks the found model in the frame
-    h, w = model.shape
-    pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
 
     # ORB keypoint detector
     orb = cv2.ORB_create()              
@@ -47,34 +44,27 @@ def main():
             matches = sorted(matches, key=lambda x: x.distance)
 
             if len(matches) > MIN_MATCHES:
-                # assuming matches stores the matches found and 
-                # returned by bf.match(des_model, des_frame)
-                # differenciate between source points and destination points
-                src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                # compute Homography
-                M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-
-                # project corners into frame
-                dst = cv2.perspectiveTransform(pts, M)  
-                # connect them with lines
-                img = cv2.polylines(frame, [np.int32(dst)], True, 255, 3, cv2.LINE_AA) 
-                cv2.imshow('frame', img)
+                gray_frame = cv2.drawKeypoints(gray_frame, kp_frame, None, color=(0,255,0), flags=0)
+                model_frame = cv2.drawKeypoints(model, kp_model, None, color=(0,255,0), flags=0)
+                cv2.imshow('image', model_frame)
+                cv2.imshow('frame', gray_frame)
             else:
                 print("Not enough matches have been found - {} / {}".format( len(matches), MIN_MATCHES))
                 # show result
-                cv2.imshow('frame', frame)
+                cv2.imshow('frame', gray_frame)
         else:
             print("taget has no features!")
-            cv2.imshow('frame', frame)
+            cv2.imshow('frame', gray_frame)
         
         key = cv2.waitKey(100)
 
         if key == ord('q'): # exit on `q`
             break
         if key == ord('p'):  # print image
-            if img.any():
-                cv2.imwrite('surface.jpg', img)
+            if gray_frame.any():
+                cv2.imwrite('features_frame.jpg', gray_frame)
+            if model_frame.any():
+                cv2.imwrite('features_model.jpg', model_frame)
         
 
 if __name__ == "__main__":

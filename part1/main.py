@@ -55,8 +55,13 @@ def main():
             print("taget has no features!")
             cv2.imshow('frame', gray_frame)
         
-        if cv2.waitKey(150) == ord('q'): # exit on `q`
+        key = cv2.waitKey(100)
+
+        if key == ord('q'): # exit on `q`
             break
+        if key == ord('p'):  # print image
+            if gray_frame.any():
+                cv2.imwrite('gray_frame.jpg', gray_frame)
         
 
 if __name__ == "__main__":

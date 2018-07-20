@@ -3,9 +3,36 @@
 
 % Use the following line for journal mode (single spaced, double, column)
 %\documentclass[twocolumn,pre,floats,aps,amsmath,amssymb]{revtex4}
-\usepackage{graphicx}
+\usepackage{listings}  % typing code blocks
+\usepackage{color}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
 \usepackage{bm}
 \usepackage{cite}
+\usepackage{amsmath}
+
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Python,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
 
 \begin{document}
 
@@ -16,11 +43,13 @@
 \maketitle
 
 
-
 \begin{abstract}
-This is an abstract.
+With technologies such as ARKit and ARCore released recently, augmented reality (AR) has become easily accessible to developers \cite{arkit, arcore}.
+Recently, more and more applications are released on application stores that incorporates AR such as the infamous "Pokemon GO" along with social media such as Instagram, Snapchat, and Facebook Messenger \cite{snapchat-ar}.
+AR has been around for a while since the mid 2000s and with better hardware such as GPUs, AR on mobile devices is now accessible \cite{old-ar}.
+In this paper, I created a simple 2D AR application that swaps business card images using a video camera.
+This application uses Python 3.5 and OpenCV 3.1 \cite{python, opencv}.
 \end{abstract}
-
 
 
 \section{Introduction}
@@ -31,36 +60,432 @@ This is an abstract.
 \section{Objectives}
 \label{sec:objectives}
 
+The objective of this application is to replace a business card in a video frame with another business card.
+In more details:
+\begin{enumerate}
+\item With a webcam, take a picture of business card.
+\item Outline the image on the page with a rectangle, i.e., draw over the four sides as they appear in the image.
+\item Match features in this area with each new image frame.
+\item Replace the original business card a new business card with the appropriate homography.
+\end{enumerate}
+For convenience sake, step 1 and 2 (outline/cropping of the initial business card) is removed with a more simple algorithm in this application at this time.
+The two business cards used throughout this paper is shown Fig. \ref{fig:businesscards} where Fig. \ref{fig:replacing} is the replacing business card that replaces Fig. \ref{fig:reference} that is the reference business card. 
+Figure \ref{fig:reference} will be called the "reference image" and Fig. \ref{fig:replacing} will be called the "replacing image" throughout the paper.
+The word "target image" refers to the video frame.
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{images/model.jpg}
+  \caption{Reference business card}
+  \label{fig:reference}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{images/transfer.jpg}
+  \caption{Replacing business card}
+  \label{fig:replacing}
+\end{subfigure}
+\caption{Two business cards used throughout the paper: where (A) is the reference business card (image that is detected and then replaced), and (B) is the replacing business card (image that replaces the reference business card).}
+\label{fig:businesscards}
+\end{figure}
 
 \section{Acknowledgments}
 \label{sec:acknowledgments}
 
+I would like to acknowledge this paper to Prof. Saito for teaching the basics of computer vision in his class. 
 
 \section{Theory}
 \label{sec:theory}
 
+The process of developing this application can be divided into several steps:
+\begin{enumerate}
+\item Identify flat surface in the image frame (from rendered video) that is the same as the reference image.
+\item Estimate homography using the transformation from the reference image frame to the target image.
+\item Derive coordinate transformation (projection) from reference to target coordinate system
+\item Render the new image onto the target coordinate system
+\end{enumerate}
 
-\section{Method}
-\label{sec:method}
+\subsection{Recognizing Reference Image inside the Target Image}
 
+The first step is recognizing the target surface.
+There are many techniques that could be used to solve this problem, but feature based recognition is simple and the method that I had learned from this computer vision class.
+The steps for this method is:
+
+\begin{itemize}
+\item feature detection (detector)
+\item feature description (descriptor)
+\item feature matching
+\end{itemize}
+
+\subsubsection{Feature Detection}
+
+In computer vision, the concept of feature detection refers to methods that aim to compute abstractions of image information which are given by points or groups of points in images. 
+Feature detection in general means finding interesting points (features) in the image such as corners, templates, edges, and so on.
+Therefore by looking in both the reference and target images for features that are similar and stands out, those features can be used to find the reference image inside of the target image which is similar to how AR markers work.
+For this application, it is assumed that the same object is found when there are enough features that are matched.
+
+Conditions:
+\begin{itemize}
+\item Reference image should show only the business card the is used for tracking
+\item Dimensions of the reference image should be given
+\item Feature in the images should be unique (such as corners or edges), and the object in the reference should be invariant
+\end{itemize}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{images/features_model.jpg}
+  \caption{ORB features in reference image}
+  \label{fig:reference_feature}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\linewidth]{images/features_frame.jpg}
+  \caption{ORB features in video frame}
+  \label{fig:frame_feature}
+\end{subfigure}
+\caption{On the left, features extracted from the target image of the surface. On the right, features extracted from a sample video frame. Note how corners have been detected as interest points in the rightmost image.}
+\label{fig:orb_feature}
+\end{figure}
+
+Figure \ref{fig:orb_feature} shows features extracted from the surface of the reference image in Fig. \ref{fig:reference_feature} and features extracted from the video frame in Fig. \ref{fig:frame_feature}.
+More about the feature used in the detection later on.
+
+\subsubsection{Feature Description}
+
+In pattern recognition, feature extraction is a special form of dimensionality reduction. 
+When the input image to an algorithm is too large to be processed and it is suspected to be notoriously redundant, then the input image will be transformed into a reduced representation set of features (feature vector).
+This process of turning the input image into a set of features is called feature extraction.
+In short, feature extraction represents the interesting points found by feature detector and compare them with other feature points in the image to reduce the representation.
+
+There are many algorithms that extract image features and compute its descriptors such as SIFT, SURF, or Harris.
+The one that we will use in this project is OpenCV's native algorithm, the ORB (Oriented FAST and Rotated BRIEF) \cite{orb}.
+This will produce binary strings as its descriptor.
+
+The OpenCV code for this is shown below:
+
+\begin{lstlisting}
+img = cv2.imread('model_image.png', 0)
+
+orb = cv2.ORB_create()  # initialize detector
+kp = orb.detect(img, None)  # find keypoints
+kp, des = orb.compute(img, kp)  # compute descriptors
+
+img2 = cv2.drawKeypoints(img, kp, img, color=(0, 255, 0), flags=0)
+cv2.imshow('keypoints', img2)
+cv2.waitKey(0)
+\end{lstlisting}
+
+\subsubsection{Feature Matching}
+
+After computing both descriptors for the reference and target image, matches are detected using hamming distance since ORB descriptors output binary strings.
+This is a brute force method and is used in this application since better methods exist for future improvements and is not the point of this application.
+A threshold of minimum number of matches should be set to decide whether an object was found or not.
+
+The code for feature matching is shown below. Note that the threshold for matches is $20$.
+
+\begin{lstlisting}
+MIN_MATCHES = 20
+cap = cv2.imread('target.jpg', 0)  # target image
+model = cv2.imread('ref.jpg', 0)  # reference image
+
+orb = cv2.ORB_create()
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True0)
+kp_model, des_model = orb.detectAndCompute(model, None)
+kp_frame, des_frame = orb.detectAndCompute(cap, None)
+matches = bf.match(des_model, des_frame)
+matches = sorted(matches, key=lambda x: x.distance)
+
+if len(matches) > MIN_MATCHES:
+    cap = cv2.drawMatches(model, kp_model, cap, kp_frame, matches[:MIN_MATCHES], 0, flags=2)
+    cv2.imshow('frame', cap)
+    cv2.waitKey(0)
+else:
+    print("Not enough points")
+\end{lstlisting}
+
+\begin{figure}
+\centering
+\includegraphics[width=1\linewidth]{images/matches.jpg}
+\caption{Closest 20 brute force matches found between the reference surface and the target image.}
+\label{fig:matches}
+\end{figure}
+
+Figure \ref{fig:matches} shows the closest 20 brute force matches found between the reference image and the target image.
+From the code and the figure, it can be said that the criteria to decide if the image was detected or not is met since for most of the cases, the ORB features are corresponding between reference and target images.
+
+\subsection{Homography Estimation}
+
+Once we have identified the reference surface in the current frame and have a set of valid matches we can proceed to estimate the homography between both images.
+This application needs transformation that maps points from the surface plane to the image plane.
+This transformation will have to be updated each new frame.
+
+To find such transformation, since a set of matches between reference image and target image is known, an homogeneous transformation will satisfy this criteria.
+To find the homography between the reference surface and the image plane, homography matrix has to be calculated.
+
+Given an object in a world coordinate system, a camera takes a picture at a certain position and orientation with respects to this world coordinate system.
+For ease of calculation, the camera coordinate system is assumed to be a pinhole camera, which roughly means that the rays passing through a 3D point $\bm{p}$ (on the object surface) and the corresponding 2D point $\bm{u}$ intersect at $\bm{c}$, the camera center.
+The coordinates in the image plane $\bm{u}(u, v)$) of a point $\bm{p}$ expressed in the camera coordinate system is computed as the following equation: 
+
+\begin{equation}
+\begin{bmatrix}
+u \cdot k\\
+v \cdot k\\
+k
+\end{bmatrix}
+=
+\begin{bmatrix}
+f_u & 0 & u_0 \\
+0 & f_v & v_0 \\
+0 & 0 & 1
+\end{bmatrix}
+\begin{bmatrix}
+x^{cam}\\
+y^{cam}\\
+z^{cam}
+\end{bmatrix}
+\end{equation}
+
+where $f_u$ and $f_v$ is the focal lengths and $(u_0, v_0)$ is the projection of the optical center.
+The focal length is the distance from the pinhole to the image plane.
+Also, $k$ is a scaling factor.
+This equation shows how the image is formed.
+However we do not know the point $p$ in the camera coordinate system.
+Therefore another matrix transformation is needed to map points from the world coordinate system to the camera coordinate system.
+The transformation is given as:
+
+\begin{equation}
+\begin{bmatrix}
+u \cdot k\\
+v \cdot k\\
+k
+\end{bmatrix}
+=
+\begin{bmatrix}
+f_u & 0 & u_0 \\
+0 & f_v & v_0 \\
+0 & 0 & 1
+\end{bmatrix}
+\begin{bmatrix}
+r_{11} & r_{12} & r_{13} & t_{x}\\
+r_{21} & r_{22} & r_{23} & t_{y}\\
+r_{31} & r_{32} & r_{33} & t_{z}
+\end{bmatrix}
+\begin{bmatrix}
+x\\
+y\\
+z\\
+1
+\end{bmatrix}
+\end{equation}
+
+This equation is simplified to become a one large projection matrix:
+
+\begin{equation}
+\begin{bmatrix}
+u \cdot k\\
+v \cdot k\\
+k
+\end{bmatrix}
+=
+\begin{bmatrix}
+p_{11} & p_{12} & p_{13} & p_{14}\\
+p_{21} & p_{22} & p_{23} & p_{24}\\
+p_{31} & p_{32} & p_{33} & p_{34}
+\end{bmatrix}
+\begin{bmatrix}
+x\\
+y\\
+z\\
+1
+\end{bmatrix}
+\end{equation}
+
+Since the points in the reference image always have its $z$ coordinate equal to $0$, the equation is then simplified even more than the equations above.
+It is clear that the product of $z$ coordinate and the third column of the projection matrix will always be $0$.
+By renaming the calibration matrix as $\bm{A}$ and taking into account the external calibration matrix is an homogeneous transformation, the equation is simplified as:
+
+\begin{equation}
+\begin{bmatrix}
+u \cdot k\\
+v \cdot k\\
+k
+\end{bmatrix}
+=
+\bm{A}
+\begin{bmatrix}
+\bm{R}_1 & \bm{R}_2 & \bm{t}
+\end{bmatrix}
+\begin{bmatrix}
+x\\
+y\\
+1
+\end{bmatrix}
+=
+\bm{H}
+\begin{bmatrix}
+x\\
+y\\
+1
+\end{bmatrix}
+\end{equation}
+
+From this equation, it can be concluded that the objective homography matrix is
+
+\begin{equation}
+\bm{H}
+=
+\begin{bmatrix}
+h_{11} & h_{12} & h_{13} \\
+h_{21} & h_{22} & h_{23}\\
+h_{31} & h_{32} & h_{33}
+\end{bmatrix}.
+\end{equation}
+
+There are several methods to estimate the values of the homography matrix.
+The one used in this application is a method called random sample consensus or better known as RANSAC \cite{ransac}.
+RANSAC is an iterative algorithm used for model fitting in the presence of a large number of outliers.
+Since there is no guarantee that all the matches that are found are actually valid matches, some false matches should be compensated (which will be the outliers).
+RANSAC is an estimation method that is robust against outliers.
+The main outline for this algorithm is:
+
+\begin{itemize}
+\item Choose a small subset of points uniformly at random
+\item Fit a model to that subset
+\item Find all remaining points that are "close" to the model and reject the rest as outliers
+\item Do this many times and choose the best model
+\end{itemize}
+
+For homography estimation, the algorithm flow is:
+
+\begin{itemize}
+\item Randomly sample 4 matches
+\item Estimate Homography $\bm{H}$
+\item Verify homography (search for other matches consistent with $\bm{H}$)
+\item Iterate until convergence
+\end{itemize}
+
+In OpenCV, this whole process is:
+
+\begin{lstlisting}
+# assuming matches stores the matches found and 
+# returned by bf.match(des_model, des_frame)
+# differenciate between source points and destination points
+src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+# compute Homography
+M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+\end{lstlisting}
+
+where $kp_{model}$ and $kp_{frame}$ are key points in reference and target images respectively.
+The threshold distance is $5.0$.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.7\linewidth]{images/surface.jpg}
+\caption{Render of the surface detection algorithm.}
+\label{fig:surface}
+\end{figure}
+
+The result of feature detection and homography estimation is shown in Fig. \ref{fig:surface}.
+The reference image is matched with the target image and the four corner points are extracted then transformed, which is shown by the blue outline.
+
+\subsection{Replacing the Reference Image} 
+
+Replacing the reference image with another image is simple given the replacing images corner points.
+This can be done by computing the affine transform from the detected corner points in the target image and the replacing image's corner points.
+This transform is then used to warp the replacing image to the target image.
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.8\linewidth]{images/frame.jpg}
+  \caption{Video frame}
+  \label{fig:frame}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.8\linewidth]{images/target_wrapped.jpg}
+  \caption{Warped replacing image}
+  \label{fig:warp_image}
+\end{subfigure}
+\caption{Result of affine transformation and warping the replacing image.}
+\label{fig:warp}
+\end{figure}
 
 \section{Results}
 \label{sec:result}
 
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{images/frame_with_target.jpg}
+\caption{Result of the application.}
+\label{fig:result}
+\end{figure}
+
+The result of the application is shown in Fig. \ref{fig:result}.
 
 \section{Discussion}
 \label{sec:discussion}
 
+The difficulty of implementing this was calculating the homography matrix and implementing the homography estimation process.
+From Fig \ref{fig:result}, one can argue that this is not "replacing" the reference image.
+While this is true, I was not able to successfully create a mask of the warped image and replace the masked section in the target image with the replacing image.
+As a future improvement, I will implement a better algorithm for replacing the image.
+For now, blending the warped image with the target image is used as a replacing feature.
+Other than this, the algorithm works perfectly without failing.
+The hardware used in this experiment is a MacBook Pro (late 2015) with Intel core i5 CPU with integrated GPU.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
+In this paper, the application was able to detect the reference image using ORB feature detector and homography estimation was used to calculate the transformation to map the replacing image to the target video frame.
+This application presents the core functionality of "replacing" the reference image with the replacing image.
+Further improvements will be tested later such as a better detection scheme and better presentation of the "replacing" feature.
+Also a GUI based "cropping" feature to get the image for reference image should be implemented.
+
 
 \begin{thebibliography}{99}
 
-\bibitem{docomowhite}
-\textit{DOCOMO 5G White Paper}, 
-NTT DOCOMO, INC., July 2014.
+\bibitem{arkit}
+Apple Inc.,
+\textit{ARKit - Apple Developer}, 
+"Apple Developers", https://developer.apple.com/arkit/, July 20, 2018.
+
+\bibitem{arcore}
+Google Inc.,
+\textit{ARCore Overview}, 
+"Google Developers, https://developers.google.com/ar/discover/, July 20, 2018.
+
+\bibitem{snapchat-ar}
+adweek.com,
+\textit{Snapchat Introduces 3 New Capabilities of Its Augmented Reality Lenses With ‘Shoppable AR’},
+https://www.adweek.com/digital/snapchat-introduces-3-new-capabilities-of-its-augmented-reality-lenses-with-shoppable-ar/, July 20, 2018.
+
+\bibitem{old-ar}
+Eric A. Taub,
+\textit{Webcam Brings 3-D to Topps Sports Cards}, 
+The New York Times, https://www.nytimes.com/2009/03/09/technology/09topps.html?mcubz=1, March 8, 2009.
+
+\bibitem{python}
+\textit{python}, 
+"Python.org" ,https://www.python.org/, July 20, 2018.
+
+\bibitem{opencv}
+\textit{OpenCV}, 
+"OpenCV.org", https://opencv.org/, July 20, 2018.
+
+\bibitem{orb}
+\textit{ORB (Oriented FAST and Rotated BRIEF)}, 
+"OpenCV.org", https://opencv.org/, July 20, 2018.
+
+\bibitem{ransac}
+\textit{Random sample consensus}, 
+"wikipedia.org", https://en.wikipedia.org/, July 20, 2018.
 
 \end{thebibliography}
 

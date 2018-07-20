@@ -5,7 +5,6 @@ MIN_MATCHES = 15
 HEIGHT = 480
 WIDTH = 640
 
-
 def main():
     
     # Compute model first
@@ -38,12 +37,9 @@ def main():
 
     # caputre loop
     while(True):
-        
         ret, frame = cap.read()
-        
         if not ret:
             break
-        
         
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -73,7 +69,7 @@ def main():
                 # img = cv2.polylines(frame, [np.int32(dst)], True, 255, 3, cv2.LINE_AA)
 
                 _target = cv2.warpAffine(target, M, (WIDTH, HEIGHT))
-                img = cv2.addWeighted(_target, 1, frame, 0.5, 1)
+                img = cv2.addWeighted(_target, 0.5, frame, 0.5, 0)
                 cv2.imshow('frame', img)
                 cv2.imshow('target', _target)
             else:
@@ -98,10 +94,7 @@ def main():
                 cv2.imwrite('frame.jpg', frame)
     
     cv2.destroyAllWindows()
-    
-    
-    
-        
+
 
 if __name__ == "__main__":
     main()
